@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Website Builder</title>
+  <!-- Prism.js for syntax highlighting -->
+  <link href="https://cloudflare.com" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cloudflare.com" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -26,7 +29,7 @@
       font-size: 1.8rem;
       color: #38bdf8;
     }
-    textarea {
+    textarea#prompt {
       flex: 1;
       background: #0f172a;
       border: 1px solid #334155;
@@ -35,7 +38,7 @@
       padding: 1rem;
       font-size: 1rem;
       resize: none;
-      min-height: 200px;
+      min-height: 150px;
     }
     button {
       background: #38bdf8;
@@ -55,11 +58,68 @@
       display: flex;
       flex-direction: column;
     }
+    .tabs {
+      display: flex;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+    }
+    .tab {
+      padding: 0.8rem 1.5rem;
+      cursor: pointer;
+      background: transparent;
+      color: #94a3b8;
+      border: none;
+      font-weight: bold;
+    }
+    .tab.active {
+      color: #38bdf8;
+      border-bottom: 2px solid #38bdf8;
+    }
+    .tab-content {
+      display: none;
+      flex: 1;
+      overflow: auto;
+    }
+    .tab-content.active {
+      display: block;
+    }
     iframe {
       width: 100%;
       height: 100%;
       border: none;
       background: white;
+    }
+    pre {
+      margin: 0;
+      padding: 1.5rem;
+      background: #1e293b !important;
+      border: 1px solid #334155;
+      border-radius: 0 0 8px 8px;
+      height: calc(100% - 50px);
+      overflow: auto;
+    }
+    code {
+      font-family: 'Fira Code', 'Courier New', monospace;
+      font-size: 0.95rem;
+      line-height: 1.8;
+      color: #e2e8f0;
+      display: block;
+      white-space: pre !important;
+    }
+    
+    .token.tag, .token.keyword { color: #f87171 !important; }
+    .token.attr-name { color: #fbbf24 !important; }
+    .token.attr-value { color: #38bdf8 !important; }
+    .token.string { color: #34d399 !important; }
+    .token.comment { color: #64748b !important; }
+
+    .editor-toolbar {
+      padding: 0.5rem;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
     }
     .loading {
       display: none;
@@ -75,55 +135,150 @@
 <body>
   <div class="panel">
     <h1>⚡ AI Site Builder</h1>
-    <textarea id="prompt" placeholder="Describe the website you want...
-e.g. A personal portfolio with dark theme and animated navigation"></textarea>
+    <textarea id="prompt" placeholder="Describe the application you want... e.g. A fully interactive scientific calculator with an explicit output display screen at the top, or a mobile-responsive todo tracker app"></textarea>
     <button id="generateBtn">Generate Website</button>
-    <div class="loading" id="loading">✨ Generating...</div>
+    <div class="loading" id="loading">✨ Executing Pipeline...</div>
     <div class="error" id="error"></div>
   </div>
   <div id="preview-container">
-    <iframe id="preview" title="Preview"></iframe>
+    <div class="tabs">
+      <button class="tab active" data-tab="preview">Preview</button>
+      <button class="tab" data-tab="html">HTML</button>
+      <button class="tab" data-tab="css">CSS</button>
+      <button class="tab" data-tab="js">JS</button>
+    </div>
+    <div class="tab-content active" id="preview">
+      <iframe id="previewFrame" title="Preview"></iframe>
+    </div>
+    <div class="tab-content" id="html">
+      <div class="editor-toolbar">
+        <button id="applyChangesBtn">Apply Changes</button>
+      </div>
+      <pre><code id="htmlCode" class="language-html" contenteditable="true"></code></pre>
+    </div>
+    <div class="tab-content" id="css">
+      <div class="editor-toolbar">
+        <button id="applyChangesBtn2">Apply Changes</button>
+      </div>
+      <pre><code id="cssCode" class="language-css" contenteditable="true"></code></pre>
+    </div>
+    <div class="tab-content" id="js">
+      <div class="editor-toolbar">
+        <button id="applyChangesBtn3">Apply Changes</button>
+      </div>
+      <pre><code id="jsCode" class="language-js" contenteditable="true"></code></pre>
+    </div>
   </div>
 
+  <script src="https://cloudflare.com"></script>
+  <script src="https://cloudflare.com"></script>
+  <script src="https://cloudflare.com"></script>
+  
   <script>
+    let currentCode = { html: '', css: '', js: '' };
+
     const btn = document.getElementById('generateBtn');
     const promptInput = document.getElementById('prompt');
-    const iframe = document.getElementById('preview');
+    const iframe = document.getElementById('previewFrame');
     const loadingEl = document.getElementById('loading');
     const errorEl = document.getElementById('error');
+    const htmlCodeEl = document.getElementById('htmlCode');
+    const cssCodeEl = document.getElementById('cssCode');
+    const jsCodeEl = document.getElementById('jsCode');
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
 
-    btn.addEventListener('click', async () => {
-      const prompt = promptInput.value.trim();
-      if (!prompt) return;
-
-      btn.disabled = true;
-      loadingEl.style.display = 'block';
-      errorEl.textContent = '';
-
-      try {
-        const response = await fetch('/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt })
+    document.addEventListener("DOMContentLoaded", () => {
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          const target = tab.dataset.tab;
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          tabContents.forEach(tc => tc.classList.remove('active'));
+          document.getElementById(target).classList.add('active');
         });
+      });
 
-        const data = await response.json();
-        if (data.error) {
-          throw new Error(data.error);
+      document.getElementById('applyChangesBtn').addEventListener('click', applyChanges);
+      document.getElementById('applyChangesBtn2').addEventListener('click', applyChanges);
+      document.getElementById('applyChangesBtn3').addEventListener('click', applyChanges);
+
+      btn.addEventListener('click', async () => {
+        const prompt = promptInput.value.trim();
+        if (!prompt) return;
+
+        btn.disabled = true;
+        loadingEl.style.display = 'block';
+        errorEl.textContent = '';
+
+        try {
+          const response = await fetch('/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+          });
+
+          const data = await response.json();
+          if (data.error) throw new Error(data.error);
+
+          currentCode = {
+            html: data.html || '',
+            css: data.css || '',
+            js: data.js || ''
+          };
+
+          htmlCodeEl.textContent = currentCode.html;
+          cssCodeEl.textContent = currentCode.css;
+          jsCodeEl.textContent = currentCode.js;
+
+          if (typeof Prism !== 'undefined') {
+            Prism.highlightElement(htmlCodeEl);
+            Prism.highlightElement(cssCodeEl);
+            Prism.highlightElement(jsCodeEl);
+          }
+
+          updatePreview();
+          document.querySelector('[data-tab="preview"]').click();
+        } catch (err) {
+          errorEl.textContent = '❌ ' + err.message;
+        } finally {
+          btn.disabled = false;
+          loadingEl.style.display = 'none';
         }
-
-        // Inject the generated HTML into the iframe
-        iframe.srcdoc = data.html;
-      } catch (err) {
-        errorEl.textContent = '❌ ' + err.message;
-      } finally {
-        btn.disabled = false;
-        loadingEl.style.display = 'none';
-      }
+      });
     });
 
-    // Default message inside iframe
+    function applyChanges() {
+      currentCode.html = htmlCodeEl.innerText;
+      currentCode.css = cssCodeEl.innerText;
+      currentCode.js = jsCodeEl.innerText;
+      
+      if (typeof Prism !== 'undefined') {
+        Prism.highlightElement(htmlCodeEl);
+        Prism.highlightElement(cssCodeEl);
+        Prism.highlightElement(jsCodeEl);
+      }
+      updatePreview();
+    }
+
+    function updatePreview() {
+      // Safe dynamic string concatenation bypasses literal template bugs completely
+      var fullHtml = '<!DOCTYPE html><html><head>' +
+        '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+        '<script src="https://tailwindcss.com"><\/script>' +
+        '<link rel="stylesheet" href="https://cloudflare.com" />' +
+        '<style>' + currentCode.css + '</style></head>' +
+        '<body class="bg-gray-100 text-gray-900 min-h-screen flex items-center justify-center p-4">' + 
+        currentCode.html +
+        '<script>' +
+        'try {\n' + currentCode.js + '\n} catch(err) { console.error("Runtime error:", err); }' +
+        '<\/script></body></html>';
+        
+      iframe.srcdoc = fullHtml;
+    }
+
     iframe.srcdoc = `<html><body style="display:flex;align-items:center;justify-content:center;height:100%;font-family:sans-serif;color:#aaa;">Your generated website will appear here</body></html>`;
   </script>
 </body>
 </html>
+
