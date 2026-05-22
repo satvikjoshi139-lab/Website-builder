@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Website Builder</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      height: 100vh;
+    }
+    .panel {
+      width: 350px;
+      background: #1e293b;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      border-right: 1px solid #334155;
+    }
+    .panel h1 {
+      font-size: 1.8rem;
+      color: #38bdf8;
+    }
+    textarea {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      padding: 1rem;
+      font-size: 1rem;
+      resize: none;
+      min-height: 200px;
+    }
+    button {
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      padding: 1rem;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.2s;
+    }
+    button:hover { background: #7dd3fc; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #preview-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: white;
+    }
+    .loading {
+      display: none;
+      margin-top: 0.5rem;
+      color: #94a3b8;
+    }
+    .error {
+      color: #f87171;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>⚡ AI Site Builder</h1>
+    <textarea id="prompt" placeholder="Describe the website you want...
+e.g. A personal portfolio with dark theme and animated navigation"></textarea>
+    <button id="generateBtn">Generate Website</button>
+    <div class="loading" id="loading">✨ Generating...</div>
+    <div class="error" id="error"></div>
+  </div>
+  <div id="preview-container">
+    <iframe id="preview" title="Preview"></iframe>
+  </div>
+
+  <script>
+    const btn = document.getElementById('generateBtn');
+    const promptInput = document.getElementById('prompt');
+    const iframe = document.getElementById('preview');
+    const loadingEl = document.getElementById('loading');
+    const errorEl = document.getElementById('error');
+
+    btn.addEventListener('click', async () => {
+      const prompt = promptInput.value.trim();
+      if (!prompt) return;
+
+      btn.disabled = true;
+      loadingEl.style.display = 'block';
+      errorEl.textContent = '';
+
+      try {
+        const response = await fetch('/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        // Inject the generated HTML into the iframe
+        iframe.srcdoc = data.html;
+      } catch (err) {
+        errorEl.textContent = '❌ ' + err.message;
+      } finally {
+        btn.disabled = false;
+        loadingEl.style.display = 'none';
+      }
+    });
+
+    // Default message inside iframe
+    iframe.srcdoc = `<html><body style="display:flex;align-items:center;justify-content:center;height:100%;font-family:sans-serif;color:#aaa;">Your generated website will appear here</body></html>`;
+  </script>
+</body>
+</html>
