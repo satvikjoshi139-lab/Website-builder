@@ -1,5 +1,5 @@
-flask
-python-dotenv
-langchain
-langchain-core
-langchain-groq
+Flask==3.0.2
+Flask-Cors==4.0.0
+python-dotenv==1.0.1
+langchain-groq==0.1.3
+langchain-core==0.1.45
